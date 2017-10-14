@@ -1,22 +1,19 @@
 const http = require('http')
 const ServerConfig = require('./config/server')
-const routes = require('./routes')
-const controllers = require('./controllers')
+const helpers = require('./helpers')
+const AppController = require('./controllers/AppController')
+const router = require('./router')
+const Exceptions = require('./exceptions')
 
-const server = http.createServer((req, res) => {
-  res.setHeader('Content-Type', 'application/x-www-form-urlencoded')
-  routes.map((route, i) => {
-    route = route.split(' ')
-    let method = route[0]
-    let url = route[1]
-    let controlAction = route[2].split('@')
-    let controller = controlAction[0]
-    let action = controlAction[1]
-    if (url === req.url && method === req.method) {
-      controllers[controller][action](req, res)
-    } else {
-      return false
-    }
+const server = http.createServer()
+
+server.on('request', (req, res) => {
+  res.setHeader('Content-Type', 'application/json')
+  helpers.parseBody(req, res, (body) => {
+    req.body = body
+    router(req, res).catch(e => {
+      if (e instanceof Exceptions.PageNotFound) AppController.send404(req, res, 'Page not found')
+    })
   })
 })
 
