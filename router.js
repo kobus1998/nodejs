@@ -7,6 +7,14 @@ const middleware = require('./middleware')
 module.exports = async (req, res) => {
   let itemsProcessed = 0 // count how many loops done
   let pageHasBeenFound = false
+
+  if (req.url.charAt(req.url.length - 1) === '/') {
+    req.url = req.url.substr(0, req.url.length - 1)
+  }
+
+  let receivedParams = req.url.split('/')
+  receivedParams.splice(0, 1)
+
   routes.forEach((route, i) => {
     route = route.split(' ') // split the string on space
 
@@ -18,10 +26,6 @@ module.exports = async (req, res) => {
 
     let urlParams = url.split('/')
     urlParams.splice(0, 1)
-
-    let receivedParams = req.url.split('/')
-    receivedParams.splice(0, 1)
-
     let params = []
 
     async function createParams () {
@@ -64,6 +68,13 @@ module.exports = async (req, res) => {
           itemsProcessed++
           if (found && req.method === method) {
             pageHasBeenFound = true
+            req.params = {}
+            params.forEach((param, index) => {
+              if (param.optional === true) {
+                param.name = param.name.substring(1)
+                req.params[param.name] = receivedParams[index]
+              }
+            })
             middleware(req, res, controller, action).then(_ => {
               controllers[controller][action](req, res)
             }).catch(e => {
