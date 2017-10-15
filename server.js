@@ -12,9 +12,11 @@ server.on('request', (req, res) => {
   helpers.parseBody(req, res, (body) => {
     req.body = body
     router(req, res).catch(e => {
+      if (e instanceof Exceptions.ExitLoop) console.log('FOUND!')
       if (e instanceof Exceptions.PageNotFound) AppController.send404(req, res, 'Page not found')
     })
   })
+  req.on('error', err => console.log(err))
 })
 
 server.listen(ServerConfig.general.port, ServerConfig.general.host, () => {

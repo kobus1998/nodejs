@@ -2,14 +2,13 @@ const routes = require('./config/routes')
 const controllers = require('./controllers')
 const AppController = require('./controllers/AppController')
 const Exceptions = require('./exceptions')
-const middleware = require('./config/middleware')
-const PolicyIndex = require('./policies')
+const middleware = require('./middleware')
 
 module.exports = async (req, res) => {
   let itemsProcessed = 0 // count how many loops done
-  routes.map((route, i) => {
-    itemsProcessed++
-    route = route.split(' ') // split the strin on space
+  let pageHasBeenFound = false
+  routes.forEach((route, i) => {
+    route = route.split(' ') // split the string on space
 
     let method = route[0]
     let url = route[1]
@@ -17,55 +16,70 @@ module.exports = async (req, res) => {
     let controller = controlAction[0] // controller name
     let action = controlAction[1] // action name
 
-    if (url === req.url && method === req.method) {
-      // all policies of route
-      const Policies = [
-        middleware['all'],
-        middleware[controller]['all'],
-        middleware[controller][action]
-      ]
-      // async function, controller gets executed after middleware
-      async function executeMiddleware () {
-        let failed = []
-        // map through policies
-        Policies.map(policies => {
-          if (typeof policies !== 'undefined') {
-            if (policies.length > 0) {
-              policies.map(policy => {
-                // execute policy
-                PolicyIndex[policy](req, res, (state = false, msg = '') => {
-                  if (state === false) failed.push(msg)
-                })
-              })
+    let urlParams = url.split('/')
+    urlParams.splice(0, 1)
+
+    let receivedParams = req.url.split('/')
+    receivedParams.splice(0, 1)
+
+    let params = []
+
+    async function createParams () {
+      urlParams.forEach((part, index) => {
+        if (part.charAt(0) === ':') {
+          params.push({ optional: true, name: part })
+        } else {
+          params.push({ optional: false, name: part })
+        }
+      })
+    }
+
+    let found = false
+
+    async function validateParams () {
+      let checked = []
+      async function checkAllParams () {
+        params.forEach((param, index) => {
+          if (param.optional === false) {
+            if (param.name === receivedParams[index]) {
+              checked.push(true)
+            } else {
+              checked.push(false)
+            }
+          } else {
+            checked.push(true)
+          }
+        })
+      }
+      checkAllParams().then(_ => {
+        if (checked.every(x => x === true) && params.length === receivedParams.length) {
+          found = true
+        }
+      })
+    }
+
+    if (!pageHasBeenFound) {
+      createParams().then(_ => {
+        validateParams().then(_ => {
+          itemsProcessed++
+          if (found && req.method === method) {
+            pageHasBeenFound = true
+            middleware(req, res, controller, action).then(_ => {
+              controllers[controller][action](req, res)
+            }).catch(e => {
+              console.log(e)
+              if (e instanceof Exceptions.NotAllowed) {
+                AppController.send403(req, res, e.msg)
+              }
+            })
+          } else {
+            console.log(itemsProcessed)
+            if (itemsProcessed === routes.length && !pageHasBeenFound) {
+              AppController.send404(req, res, 'Page not found')
             }
           }
         })
-        // send multiple
-        if (failed.length > 0) {
-          if (failed.length === 1) {
-            // simple string if only 1 failed
-            throw new Exceptions.NotAllowed(failed[0])
-          } else {
-            // array of multiple failed
-            throw new Exceptions.NotAllowed(failed)
-          }
-        }
-      }
-
-      executeMiddleware().then(_ => {
-        // if all middleware is true
-        controllers[controller][action](req, res) // execute the controller action
-      }).catch(e => {
-        // if middleware failed
-        if (e instanceof Exceptions.NotAllowed) {
-          AppController.send403(req, res, e.msg)
-        }
       })
-
-      throw new Exceptions.ExitLoop('Route is found') // exit the loop
-    }
-    if (itemsProcessed === routes.length) { //  if last loop
-      throw new Exceptions.PageNotFound(req, res) // page is not found
     }
   })
 }

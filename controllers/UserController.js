@@ -1,16 +1,14 @@
 module.exports = {
   index (req, res) {
-    let users = [
-      { name: 'user' },
-      { name: 'haha' },
-      { name: 'very good!' }
-    ]
+    console.log('indexx')
     res.statusCode = 200
-    res.write(JSON.stringify(users))
+    res.write(JSON.stringify({page: '/user'}))
     res.end()
   },
   show (req, res) {
-    console.log('user show')
+    res.statusCode = 200
+    res.write(JSON.stringify({page: '/user/show'}))
+    res.end()
   },
   store (req, res) {
     res.statusCode = 201

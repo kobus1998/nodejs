@@ -12,11 +12,10 @@ const helpers = module.exports = {
   stringToJson (str) { // querystring to json / object
     let result = {}
     let objs = str.split('&')
-    objs.map(obj => {
+    objs.forEach(obj => {
       let item = obj.split('=')
       result[item[0]] = item[1]
     })
-
     return result
   }
 }
